@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "claudegnostic",
+  "project_id": "a1d2121e-ceaa-481f-8fed-1824f4981a7c"
+}
