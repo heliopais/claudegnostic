@@ -1,0 +1,5 @@
+{not valid json at all
+{"type": "user", "sessionId": "sess-bad", "uuid": "u1", "parentUuid": null, "timestamp": "2026-06-12T14:00:00Z", "cwd": "/repo", "gitBranch": "main", "isSidechain": false, "message": {"role": "user", "content": "hi"}}
+
+{"type": "assistant", "sessionId": "sess-bad", "uuid": "a1", "parentUuid": "u1", "timestamp": "2026-06-12T14:00:01Z", "cwd": "/repo", "gitBranch": "main", "isSidechain": false, "message": {"role": "assistant", "model": "claude-sonnet-4-6", "content": [{"type": "text", "text": "ok"}], "stop_reason": "end_turn", "usage": {"input_tokens": 5, "output_tokens": 2}}}
+also broken}}}
