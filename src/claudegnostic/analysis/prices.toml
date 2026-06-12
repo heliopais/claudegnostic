@@ -1,0 +1,42 @@
+# Default Anthropic model prices (USD per million tokens).
+#
+# Keys are matched by prefix against the `model` column on `turns`. The
+# longest matching prefix wins, so "claude-opus-4-7" beats "claude-opus".
+# Unknown models contribute 0 to estimated cost — analysis functions log
+# nothing; downstream surfaces are expected to surface the unknown set.
+#
+# Fields:
+#   input              — uncached prompt tokens
+#   output             — completion tokens
+#   cache_creation     — cost to write a new cache entry (typically 1.25x input)
+#   cache_read         — cost to read from cache (typically 0.1x input)
+
+[models."claude-opus-4-7"]
+input = 15.00
+output = 75.00
+cache_creation = 18.75
+cache_read = 1.50
+
+[models."claude-opus-4-6"]
+input = 15.00
+output = 75.00
+cache_creation = 18.75
+cache_read = 1.50
+
+[models."claude-sonnet-4-6"]
+input = 3.00
+output = 15.00
+cache_creation = 3.75
+cache_read = 0.30
+
+[models."claude-sonnet-4-5"]
+input = 3.00
+output = 15.00
+cache_creation = 3.75
+cache_read = 0.30
+
+[models."claude-haiku-4-5"]
+input = 1.00
+output = 5.00
+cache_creation = 1.25
+cache_read = 0.10
