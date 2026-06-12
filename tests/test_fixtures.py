@@ -62,6 +62,19 @@ def test_compaction_fixture_flag_propagates() -> None:
     compact_flags = df["is_compact_summary"].to_list()
     assert compact_flags == [True, False]
 
+    # The compact-summary row is synthesised from a type=="user" event, so
+    # assistant-only fields are null and tool/token counts are zero/null.
+    summary = df.row(0, named=True)
+    assert summary["model"] is None
+    assert summary["stop_reason"] is None
+    assert summary["input_tokens"] is None
+    assert summary["output_tokens"] is None
+    assert summary["tool_call_count"] == 0
+    assert summary["text_output_chars"] > 0
+
+    # The following assistant turn is unaffected and keeps its usual shape.
+    assert df.row(1, named=True)["model"] == "claude-sonnet-4-6"
+
 
 def test_interrupted_fixture_stop_reason() -> None:
     df = parse_session(FIXTURES / "interrupted.jsonl")

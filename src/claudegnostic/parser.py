@@ -153,7 +153,52 @@ def parse_session(path: str | Path) -> pl.DataFrame:
     turn_index = 0
 
     for i, event in enumerate(events):
-        if event.get("type") != "assistant":
+        etype = event.get("type")
+        is_compact_summary = bool(event.get("isCompactSummary", False))
+
+        # Real Claude Code session JSONLs put the compact-summary marker on a
+        # type=="user" event (with isVisibleInTranscriptOnly + isCompactSummary
+        # at the top level). Surface it as a turn row so downstream aggregations
+        # see the compaction. Assistant-only fields stay null.
+        if etype == "user" and is_compact_summary:
+            message = event.get("message") or {}
+            if not isinstance(message, dict):
+                message = {}
+            content = message.get("content")
+            text_chars = len(content) if isinstance(content, str) else 0
+
+            ts = _parse_timestamp(event.get("timestamp"))
+            rows.append(
+                {
+                    "session_id": event.get("sessionId"),
+                    "turn_index": turn_index,
+                    "uuid": event.get("uuid"),
+                    "parent_uuid": event.get("parentUuid"),
+                    "timestamp": ts,
+                    "cwd": event.get("cwd"),
+                    "git_branch": event.get("gitBranch"),
+                    "model": None,
+                    "is_sidechain": bool(event.get("isSidechain", False)),
+                    "is_compact_summary": True,
+                    "input_tokens": None,
+                    "output_tokens": None,
+                    "cache_creation_tokens": None,
+                    "cache_read_tokens": None,
+                    "service_tier": None,
+                    "stop_reason": None,
+                    "text_output_chars": text_chars,
+                    "thinking_chars": 0,
+                    "tool_call_count": 0,
+                    "tool_names": [],
+                    "tool_input_bytes": 0,
+                    "tool_result_bytes": 0,
+                    "wall_duration_ms": None,
+                }
+            )
+            turn_index += 1
+            continue
+
+        if etype != "assistant":
             continue
 
         message = event.get("message") or {}

@@ -215,13 +215,20 @@ def test_sidechain_and_compaction_flags(tmp_path: Path) -> None:
         ),
     ]
     # Tag the second assistant as compact-summary directly to verify the flag
-    # is read at the top-level of the event itself.
+    # is read at the top-level of the assistant event itself.
     events[2]["isCompactSummary"] = True
     _write_jsonl(fixture, events)
 
     df = parse_session(fixture).sort("turn_index")
-    assert df["is_sidechain"].to_list() == [True, False]
-    assert df["is_compact_summary"].to_list() == [False, True]
+    # Three rows now: the type=="user" compact-summary event also emits a turn.
+    # Order: compact-summary user, sidechain assistant, compact-flagged assistant.
+    assert df["is_sidechain"].to_list() == [False, True, False]
+    assert df["is_compact_summary"].to_list() == [True, False, True]
+    # The user-event-shaped compact-summary row has no model and no tokens.
+    summary_row = df.row(0, named=True)
+    assert summary_row["model"] is None
+    assert summary_row["input_tokens"] is None
+    assert summary_row["tool_call_count"] == 0
 
 
 def test_malformed_lines_logged_not_raised(
