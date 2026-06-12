@@ -27,11 +27,13 @@ from plotnine import (  # noqa: E402
     geom_bar,
     geom_errorbar,
     geom_histogram,
+    geom_point,
     geom_tile,
     ggplot,
     labs,
     position_dodge,
     scale_fill_gradient,
+    scale_x_log10,
     scale_y_log10,
     theme,
     theme_minimal,
@@ -71,7 +73,7 @@ def tokens_by_model_chart(df: pl.DataFrame) -> str | None:
     if long.is_empty():
         return None
     plot = (
-        ggplot(long.to_pandas(), aes(x="model", y="tokens", fill="category"))
+        ggplot(long, aes(x="model", y="tokens", fill="category"))
         + geom_bar(stat="identity")
         + coord_flip()
         + labs(
@@ -98,7 +100,7 @@ def wall_time_per_tool_chart(df: pl.DataFrame, top_n: int = 12) -> str | None:
     if sub.is_empty():
         return None
     plot = (
-        ggplot(sub.to_pandas(), aes(x="tool", y="p50_ms"))
+        ggplot(sub, aes(x="tool", y="p50_ms"))
         + geom_bar(stat="identity", fill="#4C78A8")
         + geom_errorbar(
             aes(ymin="p50_ms", ymax="p90_ms"),
@@ -123,7 +125,7 @@ def cache_hit_ratio_chart(df: pl.DataFrame) -> str | None:
     if df.is_empty():
         return None
     plot = (
-        ggplot(df.to_pandas(), aes(x="ratio"))
+        ggplot(df, aes(x="ratio"))
         + geom_histogram(bins=20, fill="#4C78A8", color="white")
         + labs(
             title="Cache hit ratio across sessions",
@@ -158,7 +160,7 @@ def tool_co_occurrence_chart(df: pl.DataFrame, top_n_tools: int = 12) -> str | N
     if sub.is_empty():
         return None
     plot = (
-        ggplot(sub.to_pandas(), aes(x="tool_a", y="tool_b", fill="pair_count"))
+        ggplot(sub, aes(x="tool_a", y="tool_b", fill="pair_count"))
         + geom_tile()
         + scale_fill_gradient(low="#EEEEEE", high="#22577A")
         + labs(
@@ -178,12 +180,38 @@ def session_length_chart(df: pl.DataFrame) -> str | None:
     if df.is_empty() or df["count"].sum() == 0:
         return None
     plot = (
-        ggplot(df.to_pandas(), aes(x="bucket", y="count"))
+        ggplot(df, aes(x="bucket", y="count"))
         + geom_bar(stat="identity", fill="#22577A")
         + labs(
             title="Session length distribution",
             x="Turns per session",
             y="Sessions",
+        )
+        + theme_minimal()
+    )
+    return _to_data_uri(plot)
+
+
+def cost_vs_turns_chart(df: pl.DataFrame) -> str | None:
+    """Scatter of per-session estimated USD vs turn count.
+
+    Log-scale both axes — turn counts and per-session cost both span
+    multiple orders of magnitude in real usage.
+    """
+    if df.is_empty():
+        return None
+    sub = df.filter((pl.col("turn_count") > 0) & (pl.col("est_usd") > 0))
+    if sub.is_empty():
+        return None
+    plot = (
+        ggplot(sub, aes(x="turn_count", y="est_usd"))
+        + geom_point(color="#4C78A8", alpha=0.6, size=2)
+        + scale_x_log10()
+        + scale_y_log10()
+        + labs(
+            title="Estimated cost vs turns per session (log-log)",
+            x="Turns per session",
+            y="Estimated USD",
         )
         + theme_minimal()
     )

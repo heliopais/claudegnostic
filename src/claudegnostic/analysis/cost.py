@@ -238,6 +238,56 @@ def estimated_cost_by_session(
     return out
 
 
+_COST_VS_TURNS_SCHEMA: dict[str, type[pl.DataType]] = {
+    "session_id": pl.String,
+    "cwd": pl.String,
+    "turn_count": pl.Int64,
+    "est_usd": pl.Float64,
+}
+
+
+def cost_vs_turns_by_session(
+    con_or_path: ConnLike,
+    prices: PriceTable | None = None,
+) -> pl.DataFrame:
+    """Per-session total estimated USD alongside total turn count.
+
+    Args:
+        con_or_path: A DuckDB connection or a path to the stats DB.
+        prices: Optional override for the default packaged price table.
+
+    Returns:
+        DataFrame with columns ``session_id, cwd, turn_count, est_usd``.
+        One row per session that has at least one turn. Sorted by
+        ``est_usd`` descending. Returns an empty DataFrame with this
+        schema when no sessions match.
+    """
+    by_session = estimated_cost_by_session(con_or_path, prices=prices)
+    if by_session.is_empty():
+        return pl.DataFrame(schema=_COST_VS_TURNS_SCHEMA)
+
+    totals = by_session.group_by("session_id").agg(
+        pl.col("cwd").first().alias("cwd"),
+        pl.col("est_usd").sum().alias("est_usd"),
+    )
+
+    with as_connection(con_or_path) as conn:
+        turn_counts = conn.execute(
+            "SELECT session_id, COALESCE(turn_count, 0)::BIGINT AS turn_count "
+            "FROM sessions"
+        ).pl()
+
+    if turn_counts.is_empty():
+        return pl.DataFrame(schema=_COST_VS_TURNS_SCHEMA)
+
+    return (
+        totals.join(turn_counts, on="session_id", how="inner")
+        .filter(pl.col("turn_count") > 0)
+        .select(list(_COST_VS_TURNS_SCHEMA.keys()))
+        .sort("est_usd", descending=True)
+    )
+
+
 _CACHE_SAVINGS_SCHEMA: dict[str, type[pl.DataType]] = {
     "session_id": pl.String,
     "cache_read_tokens": pl.Int64,
