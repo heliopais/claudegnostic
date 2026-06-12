@@ -86,6 +86,7 @@ def test_cost_vs_context_by_turn_happy(seeded_db: duckdb.DuckDBPyConnection) -> 
         "cwd",
         "model",
         "context_tokens",
+        "cache_read_share",
         "est_usd",
     }
     # One row per turn. Session A has three turns (indices 0,1,2).
@@ -95,6 +96,7 @@ def test_cost_vs_context_by_turn_happy(seeded_db: duckdb.DuckDBPyConnection) -> 
     # Session A turn 0: input 1000, cache_read 4000, cache_creation 500
     # -> context_tokens = 5500.
     assert a0["context_tokens"] == 1_000 + 4_000 + 500
+    assert math.isclose(a0["cache_read_share"], 4_000 / 5_500, rel_tol=1e-9)
     # Opus pricing: 1000*15 + 200*75 + 500*18.75 + 4000*1.50 (per million).
     expected = (
         1_000 * 15 + 200 * 75 + 500 * 18.75 + 4_000 * 1.50
@@ -111,6 +113,7 @@ def test_cost_vs_context_by_turn_empty(empty_db: duckdb.DuckDBPyConnection) -> N
         "cwd",
         "model",
         "context_tokens",
+        "cache_read_share",
         "est_usd",
     ]
 

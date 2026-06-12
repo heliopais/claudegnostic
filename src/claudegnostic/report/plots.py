@@ -33,6 +33,7 @@ from plotnine import (  # noqa: E402
     ggplot,
     labs,
     position_dodge,
+    scale_color_gradient,
     scale_fill_gradient,
     scale_x_log10,
     scale_y_log10,
@@ -213,9 +214,15 @@ def cost_vs_context_per_turn_chart(df: pl.DataFrame) -> str | None:
     ncol = min(n_models, 2)
     nrow = (n_models + ncol - 1) // ncol
     height = max(_HEIGHT_IN, 2.4 * nrow + 1.2)
+    has_share = "cache_read_share" in sub.columns
+    point_layer = (
+        geom_point(aes(color="cache_read_share"), alpha=0.5, size=1.5)
+        if has_share
+        else geom_point(color="#22577A", alpha=0.4, size=1.5)
+    )
     plot = (
         ggplot(sub, aes(x="context_tokens", y="est_usd"))
-        + geom_point(color="#22577A", alpha=0.4, size=1.5)
+        + point_layer
         + facet_wrap("model", ncol=ncol)
         + scale_x_log10()
         + scale_y_log10()
@@ -223,9 +230,13 @@ def cost_vs_context_per_turn_chart(df: pl.DataFrame) -> str | None:
             title="Estimated cost vs context window per turn (log-log, by model)",
             x="Context tokens (input + cache_read + cache_creation)",
             y="Estimated USD",
+            color="Cache-read share" if has_share else None,
         )
         + theme_minimal()
     )
+    if has_share:
+        # Low share (cold / fresh writes) = warm color; high share (warm) = cool color.
+        plot = plot + scale_color_gradient(low="#D62728", high="#1F77B4", limits=(0.0, 1.0))
     return _to_data_uri(plot, height=height)
 
 

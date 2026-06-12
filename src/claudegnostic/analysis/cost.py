@@ -294,6 +294,7 @@ _COST_VS_CONTEXT_PER_TURN_SCHEMA: dict[str, type[pl.DataType]] = {
     "cwd": pl.String,
     "model": pl.String,
     "context_tokens": pl.Int64,
+    "cache_read_share": pl.Float64,
     "est_usd": pl.Float64,
 }
 
@@ -315,8 +316,10 @@ def cost_vs_context_by_turn(
 
     Returns:
         DataFrame with columns ``session_id, turn_index, cwd, model,
-        context_tokens, est_usd``. One row per turn. Returns an empty
-        DataFrame with this schema when no turns match.
+        context_tokens, cache_read_share, est_usd``. ``cache_read_share`` is
+        ``cache_read_tokens / context_tokens``, in ``[0, 1]``. One row per
+        turn. Returns an empty DataFrame with this schema when no turns
+        match.
     """
     table = prices if prices is not None else default_prices()
     with as_connection(con_or_path) as conn:
@@ -355,6 +358,13 @@ def cost_vs_context_by_turn(
                 / 1_000_000
                 + pl.col("cache_read_tokens") * pl.col("cache_read_price") / 1_000_000
             ).alias("est_usd"),
+        )
+        .with_columns(
+            pl.when(pl.col("context_tokens") > 0)
+            .then(pl.col("cache_read_tokens") / pl.col("context_tokens"))
+            .otherwise(0.0)
+            .cast(pl.Float64)
+            .alias("cache_read_share"),
         )
         .select(list(_COST_VS_CONTEXT_PER_TURN_SCHEMA.keys()))
         .sort(["session_id", "turn_index"])
