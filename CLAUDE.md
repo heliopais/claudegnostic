@@ -58,6 +58,15 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 <!-- END BEADS INTEGRATION -->
 
 
+## Repository Authority
+
+This repository opts into **team-maintainer** behavior for the bd workflow:
+
+- After finishing work on a bead (closing it), always `git add` the changed files and `git commit` them without asking.
+- Use the bead id in the commit message (e.g. `feat: ... (claudegnostic-NNN)`).
+- Do **not** `git push` or run Dolt remote sync unless the user explicitly asks.
+- A current "do not commit" instruction from the user still wins.
+
 ## Build & Test
 
 _Add your build and test commands here_
