@@ -24,6 +24,7 @@ from plotnine import (  # noqa: E402
     aes,
     coord_flip,
     element_text,
+    facet_wrap,
     geom_bar,
     geom_errorbar,
     geom_histogram,
@@ -193,30 +194,39 @@ def session_length_chart(df: pl.DataFrame) -> str | None:
 
 
 def cost_vs_context_per_turn_chart(df: pl.DataFrame) -> str | None:
-    """Scatter of per-turn estimated USD vs context window size.
+    """Scatter of per-turn estimated USD vs context window size, faceted by model.
 
-    One dot per turn. ``context_tokens`` (input + cache_read +
-    cache_creation) and per-turn cost both span multiple orders of
-    magnitude, so both axes are log-scaled.
+    One dot per turn, one panel per model. ``context_tokens`` (input +
+    cache_read + cache_creation) and per-turn cost both span multiple
+    orders of magnitude, so both axes are log-scaled. Panels share axes so
+    cross-model comparison stays apples-to-apples.
     """
     if df.is_empty():
         return None
-    sub = df.filter((pl.col("context_tokens") > 0) & (pl.col("est_usd") > 0))
+    sub = df.filter((pl.col("context_tokens") > 0) & (pl.col("est_usd") > 0)).with_columns(
+        pl.col("model").fill_null("<unknown>").alias("model"),
+    )
     if sub.is_empty():
         return None
+    n_models = sub["model"].n_unique()
+    # ~2.4in per row of panels; plotnine picks the wrap width.
+    ncol = min(n_models, 2)
+    nrow = (n_models + ncol - 1) // ncol
+    height = max(_HEIGHT_IN, 2.4 * nrow + 1.2)
     plot = (
         ggplot(sub, aes(x="context_tokens", y="est_usd"))
         + geom_point(color="#22577A", alpha=0.4, size=1.5)
+        + facet_wrap("model", ncol=ncol)
         + scale_x_log10()
         + scale_y_log10()
         + labs(
-            title="Estimated cost vs context window per turn (log-log)",
+            title="Estimated cost vs context window per turn (log-log, by model)",
             x="Context tokens (input + cache_read + cache_creation)",
             y="Estimated USD",
         )
         + theme_minimal()
     )
-    return _to_data_uri(plot)
+    return _to_data_uri(plot, height=height)
 
 
 def cost_vs_turns_chart(df: pl.DataFrame) -> str | None:
