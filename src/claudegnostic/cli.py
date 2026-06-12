@@ -12,6 +12,7 @@ from rich.table import Table
 
 from claudegnostic import __version__
 from claudegnostic.ingest import default_sessions_root, ingest_root
+from claudegnostic.report.render import default_out_path, render_report
 from claudegnostic.storage import connect, default_db_path
 
 if TYPE_CHECKING:
@@ -230,3 +231,57 @@ def stats(
         console.print(_render_cache_ratio(conn))
         console.print(_render_tool_leaderboard(conn, top))
         console.print(_render_compaction_summary(conn))
+
+
+@app.command()
+def report(
+    out: Path = typer.Option(
+        None,
+        "--out",
+        help="Output HTML path (default: ./claudegnostic-report-YYYY-MM-DD.html).",
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
+    ),
+    db: Path = typer.Option(
+        None,
+        "--db",
+        help="DuckDB path (default: XDG_DATA_HOME/claudegnostic/stats.duckdb).",
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
+    ),
+    since: str = typer.Option(
+        None,
+        "--since",
+        help="Lower-bound duration (e.g. 30d, 12h, 2w). Unbounded when omitted.",
+    ),
+    project: str = typer.Option(
+        None,
+        "--project",
+        help="Restrict to sessions whose cwd contains this substring.",
+    ),
+    top: int = typer.Option(10, "--top", "-n", help="Row count for top-N tables."),
+) -> None:
+    """Generate a single self-contained HTML report from the ingested DuckDB."""
+    actual_db = db if db is not None else default_db_path()
+    actual_out = out if out is not None else default_out_path()
+
+    started = time.perf_counter()
+    written = render_report(
+        actual_db,
+        out_path=actual_out,
+        since=since,
+        project=project,
+        top_n=top,
+    )
+    elapsed = time.perf_counter() - started
+
+    table = Table(title="Report summary", show_header=False, header_style="bold")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right")
+    table.add_row("Database", str(actual_db))
+    table.add_row("Output", str(written))
+    table.add_row("Size", f"{written.stat().st_size:,} bytes")
+    table.add_row("Elapsed", f"{elapsed:.2f}s")
+    console.print(table)

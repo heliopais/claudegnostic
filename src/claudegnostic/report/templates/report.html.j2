@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>claudegnostic report — {{ generated_at_human }}</title>
+<style>{{ styles | safe }}</style>
+</head>
+<body>
+
+<header>
+  <h1>claudegnostic report</h1>
+  <div class="meta">
+    <dl>
+      <dt>Generated</dt><dd>{{ generated_at_human }}</dd>
+      <dt>Database</dt><dd>{{ db_path }}</dd>
+      <dt>Sessions</dt><dd>{{ totals.sessions }}</dd>
+      <dt>Turns</dt><dd>{{ totals.turns }}</dd>
+      {% if since_label %}<dt>Since</dt><dd>{{ since_label }}</dd>{% endif %}
+      {% if project_label %}<dt>Project filter</dt><dd>{{ project_label }}</dd>{% endif %}
+    </dl>
+  </div>
+</header>
+
+{% if totals.turns == 0 %}
+<div class="empty">No turns in the database (or none match the active filters). Run <code>claudegnostic ingest</code> first.</div>
+{% endif %}
+
+<section id="cost">
+  <h2>Cost</h2>
+
+  <h3>Tokens by model</h3>
+  {% if charts.tokens_by_model %}
+    <img class="chart" alt="Tokens by model" src="{{ charts.tokens_by_model }}">
+  {% else %}
+    <div class="empty">Not enough data to render this chart.</div>
+  {% endif %}
+
+  <h3>Top sessions by estimated cost</h3>
+  {% if tables.top_cost_sessions %}
+    <table>
+      <thead>
+        <tr><th>Session</th><th>cwd</th><th>Model</th><th class="num">Est. USD</th></tr>
+      </thead>
+      <tbody>
+      {% for row in tables.top_cost_sessions %}
+        <tr>
+          <td>{{ row.session_id[:8] }}</td>
+          <td>{{ row.cwd or "" }}</td>
+          <td>{{ row.model or "" }}</td>
+          <td class="num">${{ "%.4f" | format(row.est_usd) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="empty">No priced turns in the database (or none match the active filters).</div>
+  {% endif %}
+</section>
+
+<section id="productivity">
+  <h2>Productivity</h2>
+
+  <h3>Wall time per tool</h3>
+  {% if charts.wall_time_per_tool %}
+    <img class="chart" alt="Wall time per tool" src="{{ charts.wall_time_per_tool }}">
+  {% else %}
+    <div class="empty">Not enough data to render this chart.</div>
+  {% endif %}
+
+  <h3>Cache hit ratio across sessions</h3>
+  {% if charts.cache_hit_ratio %}
+    <img class="chart" alt="Cache hit ratio" src="{{ charts.cache_hit_ratio }}">
+  {% else %}
+    <div class="empty">Not enough data to render this chart.</div>
+  {% endif %}
+</section>
+
+<section id="archaeology">
+  <h2>Workflow archaeology</h2>
+
+  <h3>Tool co-occurrence</h3>
+  {% if charts.tool_co_occurrence %}
+    <img class="chart" alt="Tool co-occurrence" src="{{ charts.tool_co_occurrence }}">
+  {% else %}
+    <div class="empty">Not enough data to render this chart.</div>
+  {% endif %}
+
+  <h3>Session length distribution</h3>
+  {% if charts.session_length %}
+    <img class="chart" alt="Session length distribution" src="{{ charts.session_length }}">
+  {% else %}
+    <div class="empty">Not enough data to render this chart.</div>
+  {% endif %}
+</section>
+
+<footer>
+  claudegnostic {{ version }} — all analysis is local, no network calls were made to produce this file.
+</footer>
+
+</body>
+</html>
