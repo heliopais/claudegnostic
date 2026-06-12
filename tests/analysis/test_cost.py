@@ -78,6 +78,43 @@ def test_estimated_cost_empty(empty_db: duckdb.DuckDBPyConnection) -> None:
     assert "est_usd" in df.columns
 
 
+def test_cost_vs_context_by_turn_happy(seeded_db: duckdb.DuckDBPyConnection) -> None:
+    df = cost.cost_vs_context_by_turn(seeded_db)
+    assert set(df.columns) == {
+        "session_id",
+        "turn_index",
+        "cwd",
+        "model",
+        "context_tokens",
+        "est_usd",
+    }
+    # One row per turn. Session A has three turns (indices 0,1,2).
+    a0 = next(
+        r for r in df.to_dicts() if r["session_id"] == "A" and r["turn_index"] == 0
+    )
+    # Session A turn 0: input 1000, cache_read 4000, cache_creation 500
+    # -> context_tokens = 5500.
+    assert a0["context_tokens"] == 1_000 + 4_000 + 500
+    # Opus pricing: 1000*15 + 200*75 + 500*18.75 + 4000*1.50 (per million).
+    expected = (
+        1_000 * 15 + 200 * 75 + 500 * 18.75 + 4_000 * 1.50
+    ) / 1_000_000
+    assert math.isclose(a0["est_usd"], expected, rel_tol=1e-9)
+
+
+def test_cost_vs_context_by_turn_empty(empty_db: duckdb.DuckDBPyConnection) -> None:
+    df = cost.cost_vs_context_by_turn(empty_db)
+    assert df.is_empty()
+    assert df.columns == [
+        "session_id",
+        "turn_index",
+        "cwd",
+        "model",
+        "context_tokens",
+        "est_usd",
+    ]
+
+
 def test_cache_savings_happy(seeded_db: duckdb.DuckDBPyConnection) -> None:
     df = cost.cache_savings(seeded_db)
     assert set(df.columns) == {

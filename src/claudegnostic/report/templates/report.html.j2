@@ -42,6 +42,13 @@
     <div class="empty">Not enough data to render this chart.</div>
   {% endif %}
 
+  <h3>Estimated cost vs context window per turn</h3>
+  {% if charts.cost_vs_context_per_turn %}
+    <img class="chart" alt="Estimated cost vs context window per turn" src="{{ charts.cost_vs_context_per_turn }}">
+  {% else %}
+    <div class="empty">Not enough data to render this chart.</div>
+  {% endif %}
+
   <h3>Top sessions by estimated cost</h3>
   {% if tables.top_cost_sessions %}
     <table>

@@ -288,6 +288,79 @@ def cost_vs_turns_by_session(
     )
 
 
+_COST_VS_CONTEXT_PER_TURN_SCHEMA: dict[str, type[pl.DataType]] = {
+    "session_id": pl.String,
+    "turn_index": pl.Int64,
+    "cwd": pl.String,
+    "model": pl.String,
+    "context_tokens": pl.Int64,
+    "est_usd": pl.Float64,
+}
+
+
+def cost_vs_context_by_turn(
+    con_or_path: ConnLike,
+    prices: PriceTable | None = None,
+) -> pl.DataFrame:
+    """Per-turn estimated USD alongside the context window sent to the model.
+
+    Context window is approximated as the sum of tokens the model actually
+    read at request time: ``input_tokens + cache_read_tokens +
+    cache_creation_tokens``. Cost is the estimated USD for the same turn
+    using the packaged price table.
+
+    Args:
+        con_or_path: A DuckDB connection or a path to the stats DB.
+        prices: Optional override for the default packaged price table.
+
+    Returns:
+        DataFrame with columns ``session_id, turn_index, cwd, model,
+        context_tokens, est_usd``. One row per turn. Returns an empty
+        DataFrame with this schema when no turns match.
+    """
+    table = prices if prices is not None else default_prices()
+    with as_connection(con_or_path) as conn:
+        turns = conn.execute(
+            """
+            SELECT
+                session_id,
+                turn_index,
+                cwd,
+                model,
+                COALESCE(input_tokens, 0)          AS input_tokens,
+                COALESCE(output_tokens, 0)         AS output_tokens,
+                COALESCE(cache_creation_tokens, 0) AS cache_creation_tokens,
+                COALESCE(cache_read_tokens, 0)     AS cache_read_tokens
+            FROM turns
+            """
+        ).pl()
+    if turns.is_empty():
+        return pl.DataFrame(schema=_COST_VS_CONTEXT_PER_TURN_SCHEMA)
+
+    priced = _attach_prices(turns, table)
+    return (
+        priced.with_columns(
+            (
+                pl.col("input_tokens")
+                + pl.col("cache_read_tokens")
+                + pl.col("cache_creation_tokens")
+            )
+            .cast(pl.Int64)
+            .alias("context_tokens"),
+            (
+                pl.col("input_tokens") * pl.col("input_price") / 1_000_000
+                + pl.col("output_tokens") * pl.col("output_price") / 1_000_000
+                + pl.col("cache_creation_tokens")
+                * pl.col("cache_creation_price")
+                / 1_000_000
+                + pl.col("cache_read_tokens") * pl.col("cache_read_price") / 1_000_000
+            ).alias("est_usd"),
+        )
+        .select(list(_COST_VS_CONTEXT_PER_TURN_SCHEMA.keys()))
+        .sort(["session_id", "turn_index"])
+    )
+
+
 _CACHE_SAVINGS_SCHEMA: dict[str, type[pl.DataType]] = {
     "session_id": pl.String,
     "cache_read_tokens": pl.Int64,

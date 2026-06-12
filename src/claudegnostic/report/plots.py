@@ -192,6 +192,33 @@ def session_length_chart(df: pl.DataFrame) -> str | None:
     return _to_data_uri(plot)
 
 
+def cost_vs_context_per_turn_chart(df: pl.DataFrame) -> str | None:
+    """Scatter of per-turn estimated USD vs context window size.
+
+    One dot per turn. ``context_tokens`` (input + cache_read +
+    cache_creation) and per-turn cost both span multiple orders of
+    magnitude, so both axes are log-scaled.
+    """
+    if df.is_empty():
+        return None
+    sub = df.filter((pl.col("context_tokens") > 0) & (pl.col("est_usd") > 0))
+    if sub.is_empty():
+        return None
+    plot = (
+        ggplot(sub, aes(x="context_tokens", y="est_usd"))
+        + geom_point(color="#22577A", alpha=0.4, size=1.5)
+        + scale_x_log10()
+        + scale_y_log10()
+        + labs(
+            title="Estimated cost vs context window per turn (log-log)",
+            x="Context tokens (input + cache_read + cache_creation)",
+            y="Estimated USD",
+        )
+        + theme_minimal()
+    )
+    return _to_data_uri(plot)
+
+
 def cost_vs_turns_chart(df: pl.DataFrame) -> str | None:
     """Scatter of per-session estimated USD vs turn count.
 

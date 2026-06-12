@@ -16,6 +16,7 @@ from claudegnostic.analysis.archaeology import (
     tool_co_occurrence,
 )
 from claudegnostic.analysis.cost import (
+    cost_vs_context_by_turn,
     cost_vs_turns_by_session,
     estimated_cost_by_session,
     tokens_by_model,
@@ -94,6 +95,7 @@ def render_report(
         tokens_df = tokens_by_model(conn, since=since_dt)
         cost_df = estimated_cost_by_session(conn)
         cost_vs_turns_df = cost_vs_turns_by_session(conn)
+        cost_vs_context_df = cost_vs_context_by_turn(conn)
         wall_df = wall_time_per_tool(conn)
         cache_df = cache_hit_ratio_by_session(conn)
         cooc_df = tool_co_occurrence(conn)
@@ -101,10 +103,12 @@ def render_report(
 
     cost_df = filter_by_cwd(cost_df, project)
     cost_vs_turns_df = filter_by_cwd(cost_vs_turns_df, project)
+    cost_vs_context_df = filter_by_cwd(cost_vs_context_df, project)
 
     charts = {
         "tokens_by_model": plots.tokens_by_model_chart(tokens_df),
         "cost_vs_turns": plots.cost_vs_turns_chart(cost_vs_turns_df),
+        "cost_vs_context_per_turn": plots.cost_vs_context_per_turn_chart(cost_vs_context_df),
         "wall_time_per_tool": plots.wall_time_per_tool_chart(wall_df),
         "cache_hit_ratio": plots.cache_hit_ratio_chart(cache_df),
         "tool_co_occurrence": plots.tool_co_occurrence_chart(cooc_df),
