@@ -29,17 +29,22 @@ from plotnine import (  # noqa: E402
     geom_errorbar,
     geom_histogram,
     geom_point,
+    geom_text,
     geom_tile,
     ggplot,
     labs,
     position_dodge,
     scale_color_gradient,
     scale_fill_gradient,
+    scale_x_discrete,
     scale_x_log10,
+    scale_y_continuous,
     scale_y_log10,
     theme,
     theme_minimal,
 )
+
+from claudegnostic.analysis.archaeology import SESSION_LENGTH_BUCKET_ORDER  # noqa: E402
 
 _DPI = 100
 _WIDTH_IN = 9.6
@@ -178,12 +183,38 @@ def tool_co_occurrence_chart(df: pl.DataFrame, top_n_tools: int = 12) -> str | N
 
 
 def session_length_chart(df: pl.DataFrame) -> str | None:
-    """Bar chart of session-count by turn-count bucket."""
+    """Bar chart of session-count by turn-count bucket.
+
+    Annotates each bar with cost-per-session and absolute cost (% of total).
+    Buckets are rendered in numeric order, not alphabetic.
+    """
     if df.is_empty() or df["count"].sum() == 0:
         return None
+
+    labelled = df.with_columns(
+        pl.format(
+            "${}/session\n${} ({}%)",
+            pl.col("cost_per_session_usd").round(2),
+            pl.col("total_cost_usd").round(0).cast(pl.Int64),
+            pl.col("pct_total_cost").round(0).cast(pl.Int64),
+        ).alias("label")
+    )
+
+    raw_max = labelled["count"].cast(pl.Float64).max()
+    y_max = float(raw_max) if isinstance(raw_max, (int, float)) else 0.0
+    headroom = y_max * 1.22 if y_max > 0 else 1.0
+
     plot = (
-        ggplot(df, aes(x="bucket", y="count"))
+        ggplot(labelled, aes(x="bucket", y="count"))
         + geom_bar(stat="identity", fill="#22577A")
+        + geom_text(
+            aes(label="label"),
+            va="bottom",
+            size=8,
+            nudge_y=y_max * 0.02 if y_max > 0 else 0.05,
+        )
+        + scale_x_discrete(limits=list(SESSION_LENGTH_BUCKET_ORDER))
+        + scale_y_continuous(limits=(0, headroom))
         + labs(
             title="Session length distribution",
             x="Turns per session",

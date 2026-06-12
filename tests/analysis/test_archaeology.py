@@ -11,17 +11,35 @@ from claudegnostic.analysis import archaeology
 
 def test_session_length_distribution_happy(seeded_db: duckdb.DuckDBPyConnection) -> None:
     df = archaeology.session_length_distribution(seeded_db)
-    assert df.columns == ["bucket", "count"]
-    rows = {r["bucket"]: r["count"] for r in df.to_dicts()}
-    assert rows["1-5"] == 2  # both sessions have <=5 turns
-    assert rows["6-20"] == 0
-    assert rows["100+"] == 0
+    assert df.columns == [
+        "bucket",
+        "count",
+        "total_cost_usd",
+        "cost_per_session_usd",
+        "pct_total_cost",
+    ]
+    rows = {r["bucket"]: r for r in df.to_dicts()}
+    assert rows["1-5"]["count"] == 2  # both sessions have <=5 turns
+    assert rows["6-20"]["count"] == 0
+    assert rows["100+"]["count"] == 0
+    # Empty buckets must report zeros for all cost metrics.
+    assert rows["6-20"]["total_cost_usd"] == 0.0
+    assert rows["6-20"]["cost_per_session_usd"] == 0.0
+    assert rows["6-20"]["pct_total_cost"] == 0.0
+    # Bucket order is preserved (numeric, not alphabetic).
+    assert list(rows.keys()) == ["1-5", "6-20", "21-50", "51-100", "100+"]
 
 
 def test_session_length_distribution_empty(empty_db: duckdb.DuckDBPyConnection) -> None:
     df = archaeology.session_length_distribution(empty_db)
     assert df.is_empty()
-    assert df.columns == ["bucket", "count"]
+    assert df.columns == [
+        "bucket",
+        "count",
+        "total_cost_usd",
+        "cost_per_session_usd",
+        "pct_total_cost",
+    ]
 
 
 def test_tool_co_occurrence_happy(seeded_db: duckdb.DuckDBPyConnection) -> None:

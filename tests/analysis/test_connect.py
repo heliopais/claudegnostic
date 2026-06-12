@@ -32,7 +32,13 @@ def test_analysis_function_accepts_path(tmp_path: Path) -> None:
 
     df = archaeology.session_length_distribution(db)
     assert df.is_empty()
-    assert df.columns == ["bucket", "count"]
+    assert df.columns == [
+        "bucket",
+        "count",
+        "total_cost_usd",
+        "cost_per_session_usd",
+        "pct_total_cost",
+    ]
 
 
 def test_as_connection_with_connection_does_not_close(

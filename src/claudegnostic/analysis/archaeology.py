@@ -5,10 +5,14 @@ from __future__ import annotations
 import polars as pl
 
 from claudegnostic.analysis._connect import ConnLike, as_connection
+from claudegnostic.analysis.cost import cost_vs_turns_by_session
 
 _SESSION_LENGTH_SCHEMA: dict[str, type[pl.DataType]] = {
     "bucket": pl.String,
     "count": pl.Int64,
+    "total_cost_usd": pl.Float64,
+    "cost_per_session_usd": pl.Float64,
+    "pct_total_cost": pl.Float64,
 }
 
 _SESSION_LENGTH_BUCKETS: tuple[tuple[str, int, int | None], ...] = (
@@ -19,9 +23,13 @@ _SESSION_LENGTH_BUCKETS: tuple[tuple[str, int, int | None], ...] = (
     ("100+", 101, None),
 )
 
+SESSION_LENGTH_BUCKET_ORDER: tuple[str, ...] = tuple(
+    name for name, _lo, _hi in _SESSION_LENGTH_BUCKETS
+)
+
 
 def session_length_distribution(con_or_path: ConnLike) -> pl.DataFrame:
-    """Histogram sessions by total turn count.
+    """Histogram sessions by total turn count, with cost per bucket.
 
     Buckets: ``1-5``, ``6-20``, ``21-50``, ``51-100``, ``100+``.
 
@@ -29,8 +37,10 @@ def session_length_distribution(con_or_path: ConnLike) -> pl.DataFrame:
         con_or_path: A DuckDB connection or a path to the stats DB.
 
     Returns:
-        DataFrame with columns ``bucket, count`` in bucket order. Buckets
-        with zero sessions are still present (count = 0). Returns an empty
+        DataFrame with columns ``bucket, count, total_cost_usd,
+        cost_per_session_usd, pct_total_cost`` in bucket order. Buckets
+        with zero sessions are still present (count = 0, costs = 0.0).
+        ``pct_total_cost`` is a percentage in [0, 100]. Returns an empty
         DataFrame with this schema only when the ``sessions`` table itself
         is empty.
     """
@@ -41,12 +51,38 @@ def session_length_distribution(con_or_path: ConnLike) -> pl.DataFrame:
     if df.is_empty():
         return pl.DataFrame(schema=_SESSION_LENGTH_SCHEMA)
 
+    cost_df = cost_vs_turns_by_session(con_or_path)
+    grand_total_cost = (
+        float(cost_df["est_usd"].sum()) if not cost_df.is_empty() else 0.0
+    )
+
     rows = []
     for name, lo, hi in _SESSION_LENGTH_BUCKETS:
         mask = pl.col("turn_count") >= lo
         if hi is not None:
             mask = mask & (pl.col("turn_count") <= hi)
-        rows.append({"bucket": name, "count": int(df.filter(mask).height)})
+        bucket_count = int(df.filter(mask).height)
+
+        if cost_df.is_empty():
+            bucket_cost = 0.0
+        else:
+            cost_mask = pl.col("turn_count") >= lo
+            if hi is not None:
+                cost_mask = cost_mask & (pl.col("turn_count") <= hi)
+            bucket_cost = float(cost_df.filter(cost_mask)["est_usd"].sum())
+
+        cost_per_session = bucket_cost / bucket_count if bucket_count > 0 else 0.0
+        pct = (bucket_cost / grand_total_cost * 100.0) if grand_total_cost > 0 else 0.0
+
+        rows.append(
+            {
+                "bucket": name,
+                "count": bucket_count,
+                "total_cost_usd": bucket_cost,
+                "cost_per_session_usd": cost_per_session,
+                "pct_total_cost": pct,
+            }
+        )
     return pl.DataFrame(rows, schema=_SESSION_LENGTH_SCHEMA)
 
 
