@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import builtins
 import json
+import sys
 from pathlib import Path
+from unittest.mock import patch
 
 from typer.testing import CliRunner
 
@@ -122,3 +125,40 @@ def test_stats_on_empty_db(runner: CliRunner, tmp_path: Path) -> None:
     result = runner.invoke(app, ["stats", "--db", str(db_path)])
     assert result.exit_code == 0, result.stdout
     assert "Cache hit ratio" in result.stdout
+
+
+def test_dashboard_invokes_launcher(runner: CliRunner, tmp_path: Path) -> None:
+    from claudegnostic.dashboard import cli as dashboard_cli
+
+    db_path = tmp_path / "stats.duckdb"
+    captured: dict[str, object] = {}
+
+    def fake_launch(db: Path, port: int) -> int:
+        captured["db"] = db
+        captured["port"] = port
+        return 0
+
+    with patch.object(dashboard_cli, "launch", fake_launch):
+        result = runner.invoke(
+            app, ["dashboard", "--db", str(db_path), "--port", "9000"]
+        )
+
+    assert result.exit_code == 0, result.stdout
+    assert captured["db"] == db_path
+    assert captured["port"] == 9000
+
+
+def test_dashboard_missing_extra_prints_hint(runner: CliRunner) -> None:
+    real_import = builtins.__import__
+
+    def fake_import(name: str, *args: object, **kwargs: object) -> object:
+        if name == "claudegnostic.dashboard.cli":
+            raise ImportError("No module named 'streamlit'")
+        return real_import(name, *args, **kwargs)  # type: ignore[arg-type]
+
+    sys.modules.pop("claudegnostic.dashboard.cli", None)
+    with patch.object(builtins, "__import__", fake_import):
+        result = runner.invoke(app, ["dashboard"])
+
+    assert result.exit_code == 1
+    assert "claudegnostic[dashboard]" in result.stdout

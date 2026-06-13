@@ -26,6 +26,9 @@ dependencies = [
     "plotnine>=0.13.0",
 ]
 
+[project.optional-dependencies]
+dashboard = ["streamlit>=1.30"]
+
 [project.scripts]
 claudegnostic = "claudegnostic.cli:app"
 
@@ -93,7 +96,7 @@ module = "tests.*"
 disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
-module = ["plotnine.*", "matplotlib.*"]
+module = ["plotnine.*", "matplotlib.*", "streamlit.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

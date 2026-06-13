@@ -285,3 +285,30 @@ def report(
     table.add_row("Size", f"{written.stat().st_size:,} bytes")
     table.add_row("Elapsed", f"{elapsed:.2f}s")
     console.print(table)
+
+
+@app.command()
+def dashboard(
+    db: Path = typer.Option(
+        None,
+        "--db",
+        help="DuckDB path (default: XDG_DATA_HOME/claudegnostic/stats.duckdb).",
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
+    ),
+    port: int = typer.Option(8501, "--port", "-p", help="Port for the Streamlit server."),
+) -> None:
+    """Launch the optional Streamlit dashboard (requires ``claudegnostic[dashboard]``)."""
+    try:
+        from claudegnostic.dashboard.cli import launch
+    except ImportError:
+        console.print(
+            "[red]Streamlit is not installed.[/red] "
+            "Install the extra with: "
+            r"[bold]pip install 'claudegnostic\[dashboard]'[/bold]",
+        )
+        raise typer.Exit(code=1) from None
+
+    actual_db = db if db is not None else default_db_path()
+    raise typer.Exit(code=launch(actual_db, port))
